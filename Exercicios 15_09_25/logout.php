@@ -1,10 +1,8 @@
 <?php
 session_start();
 
-// Destrói todas as variáveis de sessão
 $_SESSION = array();
 
-// Se for preciso destruir completamente a sessão, também apaga o cookie de sessão.
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -13,9 +11,23 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// Finalmente, destrói a sessão
 session_destroy();
-
-echo "Você saiu do sistema com sucesso!";
-echo "<p><a href='login_form.php'>Fazer Login Novamente</a></p>";
 ?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logout</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5 text-center">
+        <div class="alert alert-success" role="alert">
+            Você saiu do sistema com sucesso!
+        </div>
+        <p><a href="login_form.php" class="btn btn-primary">Fazer Login Novamente</a></p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
