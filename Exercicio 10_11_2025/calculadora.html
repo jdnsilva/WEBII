@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora com Memória em API</title>
+    <style>
+        .calculadora {
+            width: 300px;
+            margin: 50px auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            box-shadow: 2px 2px 5px #aaa;
+        }
+        #display {
+            width: 100%;
+            height: 50px;
+            font-size: 2em;
+            text-align: right;
+            margin-bottom: 10px;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        .botoes {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+        }
+        button {
+            padding: 15px;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculadora">
+    <input type="text" id="display" value="0" readonly>
+    <div class="botoes">
+        <button id="mc">MC</button>
+        <button id="mr">MR</button>
+        <button id="mplus">M+</button>
+        <button id="mminus">M-</button>
+        
+        <button id="c">C</button>
+        <button id="raiz">√</button>
+        <button id="divide">/</button>
+        <button id="multiplica">*</button>
+        
+        <button class="numero" data-valor="7">7</button>
+        <button class="numero" data-valor="8">8</button>
+        <button class="numero" data-valor="9">9</button>
+        <button id="subtrai">-</button>
+
+        <button class="numero" data-valor="4">4</button>
+        <button class="numero" data-valor="5">5</button>
+        <button class="numero" data-valor="6">6</button>
+        <button id="soma">+</button>
+
+        <button class="numero" data-valor="1">1</button>
+        <button class="numero" data-valor="2">2</button>
+        <button class="numero" data-valor="3">3</button>
+        <button id="igual" style="grid-row: span 2">=</button>
+
+        <button class="numero" data-valor="0" style="grid-column: span 2">0</button>
+        <button class="numero" data-valor=".">.</button>
+    </div>
+</div>
+
+<script>
+    const display = document.getElementById('display');
+    let primeiroValor = null;
+    let operacaoPendente = null;
+    let aguardandoSegundoValor = false;
+
+    // URL base das suas APIs PHP
+    const API_BASE_URL = "http://localhost/api/"; // **AJUSTE ESTA URL**
+
+    // --- Lógica da API ---
+
+    // Função genérica para chamar a API de operações
+    async function chamarApiOperacao(endpoint, params) {
+        const url = `${API_BASE_URL}${endpoint}?${params}`;
+        try {
+            const resposta = await fetch(url);
+            const dados = await resposta.json();
+
+            if (resposta.ok) {
+                // Se a API retornar 'resultado', usa. Caso contrário, assume que é uma API de memória.
+                const resultado = dados.resultado !== undefined ? dados.resultado : dados.nova_memoria;
+                display.value = String(resultado);
+                primeiroValor = resultado;
+                operacaoPendente = null;
+                aguardandoSegundoValor = false;
+            } else {
+                alert(`Erro: ${dados.erro || 'Falha na comunicação com a API.'}`);
+                display.value = 'ERRO';
+            }
+        } catch (error) {
+            console.error('Erro na requisição da API:', error);
+            alert('Erro ao conectar com o servidor.');
+            display.value = 'ERRO';
+        }
+    }
+
+    // --- Lógica dos Botões da Calculadora ---
+
+    // Botões Numéricos
+    document.querySelectorAll('.numero').forEach(botao => {
+        botao.addEventListener('click', () => {
+            const valor = botao.getAttribute('data-valor');
+            if (display.value === '0' || aguardandoSegundoValor || display.value === 'ERRO') {
+                display.value = (valor === '.') ? '0.' : valor;
+                aguardandoSegundoValor = false;
+            } else if (valor === '.' && display.value.includes('.')) {
+                return; // Evita múltiplos pontos decimais
+            } else {
+                display.value += valor;
+            }
+        });
+    });
+
+    // Botão Limpar (C)
+    document.getElementById('c').addEventListener('click', () => {
+        display.value = '0';
+        primeiroValor = null;
+        operacaoPendente = null;
+        aguardandoSegundoValor = false;
+    });
+    
+    // Botões de Operação (+, -, *, /)
+    document.querySelectorAll('#soma, #subtrai, #multiplica, #divide').forEach(botao => {
+        botao.addEventListener('click', () => {
+            const valorAtual = parseFloat(display.value);
+            
+            if (primeiroValor === null) {
+                primeiroValor = valorAtual;
+            } else if (!aguardandoSegundoValor) {
+                // Se já houver uma operação pendente, executa antes de salvar a nova
+                document.getElementById('igual').click();
+                // O resultado se torna o novo primeiroValor
+            }
+            
+            operacaoPendente = botao.id.replace(/a$/, ''); // Remove 'a' (soma, subtrai...)
+            aguardandoSegundoValor = true;
+        });
+    });
+    
+    // Botão Raiz (Operação unária)
+    document.getElementById('raiz').addEventListener('click', () => {
+        const valorAtual = parseFloat(display.value);
+        if (isNaN(valorAtual)) return;
+        
+        chamarApiOperacao('raiz.php', `valor=${valorAtual}`);
+    });
+
+    // Botão IGUAL (=)
+    document.getElementById('igual').addEventListener('click', () => {
+        if (operacaoPendente === null || primeiroValor === null) {
+            return;
+        }
+
+        const segundoValor = parseFloat(display.value);
+        if (isNaN(segundoValor)) return;
+
+        let endpoint;
+        let params;
+
+        // O endpoint será o nome da operação + .php
+        endpoint = `${operacaoPendente}.php`;
+        params = `x=${primeiroValor}&y=${segundoValor}`;
+        
+        // Chama a API com os dois valores
+        chamarApiOperacao(endpoint, params);
+        // O primeiroValor será atualizado dentro de chamarApiOperacao
+    });
+
+
+    // --- Botões de Memória (M+, M-, MR, MC) ---
+
+    // Memory Clear (MC) - Limpa a memória no banco
+    document.getElementById('mc').addEventListener('click', () => {
+        chamarApiOperacao('mc.php', '');
+    });
+    
+    // Memory Read (MR) - Lê a memória e exibe no display
+    document.getElementById('mr').addEventListener('click', async () => {
+        try {
+            const resposta = await fetch(`${API_BASE_URL}mr.php`);
+            const dados = await resposta.json();
+
+            if (resposta.ok) {
+                // Coloca o valor da memória no display
+                display.value = String(dados.memoria);
+                aguardandoSegundoValor = true; // Permite iniciar uma nova operação com o valor lido
+            } else {
+                alert(`Erro ao ler memória: ${dados.erro || 'Falha na comunicação.'}`);
+            }
+        } catch (error) {
+            alert('Erro ao conectar com o servidor MR.');
+        }
+    });
+
+    // Memory Plus (M+) - Adiciona o valor do display à memória
+    document.getElementById('mplus').addEventListener('click', () => {
+        const valorAtual = parseFloat(display.value);
+        if (isNaN(valorAtual)) return;
+        chamarApiOperacao('mplus.php', `valor=${valorAtual}`);
+    });
+
+    // Memory Minus (M-) - Subtrai o valor do display da memória
+    document.getElementById('mminus').addEventListener('click', () => {
+        const valorAtual = parseFloat(display.value);
+        if (isNaN(valorAtual)) return;
+        chamarApiOperacao('mminus.php', `valor=${valorAtual}`);
+    });
+
+</script>
+
+</body>
+</html>
